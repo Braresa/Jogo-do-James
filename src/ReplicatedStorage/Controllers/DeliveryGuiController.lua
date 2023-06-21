@@ -20,12 +20,13 @@ local Knit = require(Packages.Knit)
 local Player = Players.LocalPlayer
 local DeliveryGui = Player.PlayerGui:WaitForChild("DeliveryGui")
 local Warning = DeliveryGui.Warning
-local RequestButton = DeliveryGui.Request
+local RequestFrame = DeliveryGui.RequestFrame
+local RequestButton = RequestFrame.Request
 local OnGoingFrame = DeliveryGui.OnGoing
 local CancelButton = OnGoingFrame.CancelButton
 local OnDelivery = false
 
-local TimerLabel = OnGoingFrame.TimerLabel
+local TimerLabel = OnGoingFrame.Inside.TimerLabel
 
 local SFX = SoundService:WaitForChild("SFX")
 
@@ -71,7 +72,7 @@ end
 local function LocationGenerated(expirySeconds,npc)
 	OnDelivery = true
 	task.defer(startTimer,expirySeconds)
-	RequestButton.Visible = false
+	RequestFrame.Visible = false
 	OnGoingFrame.Visible = true
 	SFX.DeliveryStarted:Play()
 	local highlight = Instance.new("Highlight")
@@ -92,7 +93,7 @@ local function FailDelivery()
 	OnDelivery = false
 	warnText("A entrega falhou!", Color3.fromRGB(255,0,0))
 	OnGoingFrame.Visible = false
-	RequestButton.Visible = true
+	RequestFrame.Visible = true
 
 	--[[local tweenInfo = TweenInfo.new(2.5, Enum.EasingStyle.Linear)
 	local tween = TweenService:Create(RequestButton, tweenInfo, { BackgroundColor3 = DefaultButtonColor })

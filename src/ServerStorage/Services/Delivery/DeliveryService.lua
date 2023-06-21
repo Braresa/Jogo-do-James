@@ -102,7 +102,7 @@ function GetPlayersFriend(player, destiny)
 			local success, result = pcall(Players.GetFriendsAsync, Players, userId)
 
 			if success then
-				print("Acessar a API do roblox para pegar os amigos foium sucesso, processando as páginas.")
+				print("Players.GetFriendsAsync foi um sucesso, processando as páginas retornadas.")
 				processPages(result)
 			else
 				warn(`Ocorreu um erro ao tentar pegar os amigos de um player, criando um dummy default.`)
