@@ -1,0 +1,20 @@
+[package]
+name = "ibugames/animesimulator"
+version = "0.1.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+
+[dependencies]
+Knit = "sleitnick/knit@1.4.7"                   # Framework for building Roblox games with a client-server architecture
+Component = "sleitnick/component@2.4.6"         # Component class
+Input = "sleitnick/input@2.1.1"                 # Basic input classes
+Signal = "sleitnick/signal@1.4.0"               # Signal class
+Cmdr = "evaera/cmdr@1.9.0"                      # Command line interface for Roblox
+TableUtil = "sleitnick/table-util@1.2.0"        # Utility functions for working with tables
+Promise = "evaera/promise@4.0.0"                # Promise class
+Trove = "sleitnick/trove@0.5.0"                 # Trove class for tracking and cleaning up objects
+Shake = "sleitnick/shake@0.1.7"                 # Shake library for making things shake
+Streamable = "sleitnick/streamable@1.2.4"       # Streamable class for observing changes in StreamingEnabled
+Timer = "sleitnick/timer@1.1.2"                 # Timer class
+Comm = "sleitnick/comm@0.3.1"                   # Comm class for communicating between client and server
+Replion = "ytrev/replion@1.0.0-rc.5"             

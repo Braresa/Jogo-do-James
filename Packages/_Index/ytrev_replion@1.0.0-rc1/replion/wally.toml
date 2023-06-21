@@ -1,0 +1,12 @@
+[package]
+name = "ytrev/replion"
+description = "A lightweight State Replicator."
+version = "1.0.0-rc1"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+authors = ["yTrev"]
+exclude = ["**"]
+include = ["src", "src/**", "wally.toml", "default.project.json"]
+
+[dependencies]
+Signal = "sleitnick/signal@1.2.1"
