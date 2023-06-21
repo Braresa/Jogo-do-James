@@ -36,7 +36,7 @@ local CurrencyService = Knit.CreateService({
 -- ===========================================================================
 
 function getReplion(player)
-	return ReplionServer:GetReplionFor(player)
+	return ReplionServer:GetReplionFor(player, "PlayerData")
 end
 
 function GetMoney(player)
@@ -73,7 +73,9 @@ function CurrencyService:GetMoney(player)
 end
 
 function CurrencyService:GiveSalad(player, value)
-	if FruitsSalad[player] >= 10 then
+	local playerReplion = getReplion(player)
+	local maxSalad = playerReplion:Get("maxSalad")
+	if FruitsSalad[player] >= maxSalad then
 		return
 	end
 	FruitsSalad[player] = FruitsSalad[player] + value
