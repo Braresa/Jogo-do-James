@@ -17,7 +17,7 @@ local Knit = require(Packages.Knit)
 -- ===========================================================================
 
 local AvailablePoints = {}
-local DeliveryConfig = require(script.Parent.CurrencyConfig)
+local DeliveryConfig = require(script.Parent.DeliveryConfig)
 local ActivePlayers = {}
 local expirySeconds = DeliveryConfig.expirySeconds
 

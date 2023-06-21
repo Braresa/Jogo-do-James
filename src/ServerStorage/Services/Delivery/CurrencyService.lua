@@ -17,9 +17,9 @@ local ReplionServer
 -- Variables
 -- ===========================================================================
 local FruitsSalad = {}
-local CurrencyConfig = require(script.Parent.CurrencyConfig)
-local CurrencyName = CurrencyConfig.currencyName
-local StartingFruitSalad = CurrencyConfig.startingFruitSalad
+local DeliveryConfig = require(script.Parent.DeliveryConfig)
+local CurrencyName = DeliveryConfig.currencyName
+local StartingFruitSalad = DeliveryConfig.startingFruitSalad
 
 -- ===========================================================================
 -- Services
@@ -89,7 +89,7 @@ end
 
 function CurrencyService:DeliverSucess(player)
     self:RemoveSalad(player,1)
-    local moneyPerFruit = CurrencyConfig.moneyPerFruitSalad
+    local moneyPerFruit = DeliveryConfig.moneyPerFruitSalad
     local rng = Random.new():NextInteger(1, #moneyPerFruit)
     local valueToGive = moneyPerFruit[rng]
     GiveMoney(player,valueToGive)
