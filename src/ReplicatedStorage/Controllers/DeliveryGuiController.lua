@@ -106,7 +106,7 @@ end
 local function Delivered()
 	OnDelivery = false
 	OnGoingFrame.Visible = false
-	RequestButton.Visible = true
+	RequestFrame.Visible = true
 	SFX.DeliveryComplete:Play()
 	warnText("A entrega foi um sucesso!",Color3.fromRGB(0, 255, 0))
 end
