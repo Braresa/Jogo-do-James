@@ -64,7 +64,7 @@ end
 -- ===========================================================================
 
 function CurrencyService:CheckSalad(player)
-	print(`{player.Name} tem {FruitsSalad[player]} de fruta!`)
+	print(`{player.Name} tem {FruitsSalad[player]} de salada de fruta!`)
 	return FruitsSalad[player]
 end
 

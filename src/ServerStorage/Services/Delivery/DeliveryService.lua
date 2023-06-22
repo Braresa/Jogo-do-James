@@ -248,7 +248,11 @@ function DeliveryService.Client:GenerateLocation(player)
 end
 
 function DeliveryService.Client:CancelDelivery(player)
+	if ActivePlayers[player].Active == false then
+		return self.Client.Warning:Fire("O")
+	else
 	return self.Server:DeliverFailed(player)
+	end
 end
 -- ===========================================================================
 -- Knit Initialization

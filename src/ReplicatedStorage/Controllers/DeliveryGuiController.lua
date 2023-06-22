@@ -11,7 +11,9 @@ local TweenService = game:GetService("TweenService")
 -- Dependencies
 -- ===========================================================================
 local Packages = ReplicatedStorage.Packages
+local Promise = require(ReplicatedStorage.Packages.Promise)
 local Knit = require(Packages.Knit)
+local Trove = require(ReplicatedStorage.Packages.Trove)
 local Replion = require(ReplicatedStorage.Packages.Replion)
 local ReplionClient = Replion.Client
 
@@ -25,7 +27,7 @@ local Warning = DeliveryGui.Warning
 local RequestFrame = DeliveryGui.RequestFrame
 local RequestButton = RequestFrame.Request
 local OnGoingFrame = DeliveryGui.OnGoing
-local CancelButton = OnGoingFrame.CancelButton
+local CancelButton = OnGoingFrame.Cancel.CancelButton
 local OnDelivery = false
 local TimerLabel = OnGoingFrame.Inside.TimerLabel
 local MoneyFrame = DeliveryGui.MoneyFrame
@@ -34,7 +36,7 @@ local Money = MoneyFrame.Money
 local DefaultPosition = {
 	[RequestFrame] = RequestFrame.Position,
 	[MoneyFrame] = MoneyFrame.Position,
-	[OnGoingFrame] = OnGoingFrame.Position
+	[OnGoingFrame] = OnGoingFrame.Position,
 }
 
 local SFX = SoundService:WaitForChild("SFX")
@@ -51,36 +53,54 @@ local DeliveryGuiController = Knit.CreateController({
 -- ===========================================================================
 
 function TweenCreate(gui, speed, animation)
-	local enumType = Enum.EasingStyle.Linear
-	local tweenInfo = TweenInfo.new(speed, enumType)
+	return Promise.new(function(resolve)
+		local guiTrove = Trove.new()
+		local enumType = Enum.EasingStyle.Linear
+		local tweenInfo = TweenInfo.new(speed, enumType)
 
-	local function playAnimation(targetGui)
-		local originalPosition = DefaultPosition[targetGui]
-		print(originalPosition)
-		if animation == "leftOut" then
-			local propertyTable = { Position = targetGui.Position - UDim2.new(0.1, 0, 0, 0) }
-			local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
-			return tween
-		elseif animation == "original" then
-			local propertyTable = { Position = originalPosition }
-			local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
-			return tween
-		elseif animation == "rightIn" then
-			gui.Position = gui.Position + UDim2.new(0.1, 0, 0, 0)
-			local propertyTable = { Position = originalPosition }
-			local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
-			return tween
+		local function createAnimation(targetGui)
+			local originalPosition = DefaultPosition[targetGui]
+			if animation == "leftOut" then
+				local propertyTable = { Position = targetGui.Position - UDim2.new(0.1, 0, 0, 0) }
+				local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
+				return tween
+			elseif animation == "original" then
+				local propertyTable = { Position = originalPosition }
+				local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
+				return tween
+			elseif animation == "rightIn" then
+				gui.Position = gui.Position - UDim2.new(0.5, 0, 0, 0)
+				local propertyTable = { Position = originalPosition }
+				local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
+				return tween
+			end
+			return warn("Nenhuma animação válida foi inserida.")
 		end
-		return warn("Nenhuma animação foi inserida.")
-	end
 
-	if typeof(gui) == "table" then
-		for _, tableGui in ipairs(gui) do
-			playAnimation(tableGui):Play()
+		if typeof(gui) == "table" then
+			for index, tableGui in ipairs(gui) do
+				local tween = createAnimation(tableGui)
+				guiTrove:Add(tween)
+				if index == #gui then
+					tween:Play()
+					guiTrove:Connect(tween.Completed,function()
+						guiTrove:Destroy()
+						resolve()
+					end)
+				else
+					tween:Play()
+				end
+			end
+		else
+			local tween = createAnimation(gui)
+			guiTrove:Add(tween)
+			tween:Play()
+			guiTrove:Connect(tween.Completed,function()
+				guiTrove:Destroy()
+				resolve()
+			end)
 		end
-	else
-		playAnimation(gui):Play()
-	end
+	end)
 end
 
 local lastMessageAt = 0
@@ -116,9 +136,9 @@ end
 local function LocationGenerated(expirySeconds, npc)
 	OnDelivery = true
 	task.defer(startTimer, expirySeconds)
-
-	RequestFrame.Visible = false
+	TweenCreate(OnGoingFrame, 0.5, 'rightIn')
 	OnGoingFrame.Visible = true
+	RequestFrame.Visible = false
 	SFX.DeliveryStarted:Play()
 	local highlight = Instance.new("Highlight")
 	highlight.Parent = npc
@@ -135,27 +155,23 @@ end
 
 local function FailDelivery()
 	OnDelivery = false
-	TweenCreate(OnGoingFrame, 0.5, "leftOut")
+	TweenCreate(OnGoingFrame, 0.4, "leftOut"):andThen(function()
 	OnGoingFrame.Visible = false
 	RequestFrame.Visible = true
 	TweenCreate({ RequestFrame, MoneyFrame }, 0.5, "original")
 	warnText("A entrega falhou!", Color3.fromRGB(255, 0, 0))
-	--[[local tweenInfo = TweenInfo.new(2.5, Enum.EasingStyle.Linear)
-	local tween = TweenService:Create(RequestButton, tweenInfo, { BackgroundColor3 = DefaultButtonColor })
-	RequestButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-	RequestButton.Text = "A entrega falhou!"
-	tween:Play()
-	]]
+	end)
 end
 
 local function Delivered()
 	OnDelivery = false
-	TweenCreate(OnGoingFrame, 0.5, "leftOut")
+	TweenCreate(OnGoingFrame, 0.5, "leftOut"):andThen(function()
 	OnGoingFrame.Visible = false
 	RequestFrame.Visible = true
 	SFX.DeliveryComplete:Play()
 	warnText("A entrega foi um sucesso!", Color3.fromRGB(0, 255, 0))
 	TweenCreate({ RequestFrame, MoneyFrame }, 0.5, "original")
+end)
 end
 
 local function NoSalad() -- Ativado quando o player não possui saladas para entregar.
@@ -197,8 +213,9 @@ end
 	+ direita
 ]]
 function DeliveryGuiController:RequestSalad()
-	TweenCreate({ MoneyFrame, RequestFrame }, 0.5, "leftOut")
+	TweenCreate({ MoneyFrame, RequestFrame }, 0.5, "leftOut"):andThen(function()
 	self.DeliveryService:GenerateLocation()
+end)
 end
 
 function DeliveryGuiController:CancelDelivery()
@@ -207,9 +224,9 @@ end
 
 function UpdateMoneyLabel(newValue, oldValue)
 	if oldValue > newValue then
-		-- perdeu dinheiro
+		print("Perdeu dinheiro")
 	elseif oldValue < newValue then
-		-- ganhou dinheiro
+		print("Ganhou dinheiro")
 	end
 end
 
@@ -228,14 +245,11 @@ end
 ]]
 function DeliveryGuiController:KnitStart()
 	print("DeliveryGuiController started")
+	ReplionClient:WaitReplion('PlayerData')
 	self:InitGui()
-
-	ReplionClient:AwaitReplion("PlayerData", function(data)
-		self.Replion = data
-		local dinheiro = data:Get("Dinheiro")
-		Money.Text = tostring(dinheiro)
-		data:OnChange("Dinheiro", UpdateMoneyLabel)
-	end)
+	self.Replion = ReplionClient:GetReplion("PlayerData")
+	Money.Text = tostring(self.Replion:Get("Dinheiro"))
+	self.Replion:OnChange("Dinheiro", UpdateMoneyLabel)
 	RequestButton.Activated:Connect(function()
 		warnText("A entrega irá começar em breve!", Color3.fromRGB(255, 255, 255))
 		self:RequestSalad()
