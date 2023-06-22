@@ -12,6 +12,8 @@ local TweenService = game:GetService("TweenService")
 -- ===========================================================================
 local Packages = ReplicatedStorage.Packages
 local Knit = require(Packages.Knit)
+local Replion = require(ReplicatedStorage.Packages.Replion)
+local ReplionClient = Replion.Client
 
 -- ===========================================================================
 -- Variables
@@ -227,8 +229,6 @@ end
 function DeliveryGuiController:KnitStart()
 	print("DeliveryGuiController started")
 	self:InitGui()
-	local Replion = require(ReplicatedStorage.Packages.Replion)
-	local ReplionClient = Replion.Client
 
 	ReplionClient:AwaitReplion("PlayerData", function(data)
 		self.Replion = data
