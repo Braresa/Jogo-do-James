@@ -10,7 +10,6 @@ local TweenService = game:GetService("TweenService")
 -- Dependencies
 -- ===========================================================================
 local Packages = ReplicatedStorage.Packages
-local Timer = require(ReplicatedStorage.Packages.Timer)
 local Knit = require(Packages.Knit)
 
 -- ===========================================================================
@@ -25,16 +24,16 @@ local RequestButton = RequestFrame.Request
 local OnGoingFrame = DeliveryGui.OnGoing
 local CancelButton = OnGoingFrame.CancelButton
 local OnDelivery = false
-
 local TimerLabel = OnGoingFrame.Inside.TimerLabel
+local DefaultRequestPosition = RequestFrame.Position
 
 local SFX = SoundService:WaitForChild("SFX")
 
 -- ===========================================================================
 -- Controllers
 -- ===========================================================================
-local DeliveryGuiController = Knit.CreateController({
-	Name = "DeliveryGuiController",
+local GuiController = Knit.CreateController({
+	Name = "GuiController",
 })
 
 -- ===========================================================================
@@ -119,15 +118,30 @@ end
 -- Public Methods
 -- ===========================================================================
 
-function DeliveryGuiController:InitServices()
+function GuiController:InitServices()
 	self.DeliveryService = Knit.GetService("DeliveryService")
 end
 
-function DeliveryGuiController:RequestSalad()
+--[[
+	- esquerda
+	+ direita
+]]
+function GuiController:RequestSalad()
+	local tweenInfo = TweenInfo.new(2.5,Enum.EasingStyle.Linear)
+	local tween = TweenService:Create(RequestFrame, tweenInfo, {DefaultRequestPosition = UDim2.new(-1,DefaultRequestPosition.Position.Y)})
+	tween:Play()
+	
 	self.DeliveryService:GenerateLocation()
+
+	--[[local tweenInfo = TweenInfo.new(2.5, Enum.EasingStyle.Linear)
+	local tween = TweenService:Create(RequestButton, tweenInfo, { BackgroundColor3 = DefaultButtonColor })
+	RequestButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+	RequestButton.Text = "A entrega falhou!"
+	tween:Play()
+	]]
 end
 
-function DeliveryGuiController:CancelDelivery()
+function GuiController:CancelDelivery()
 	self.DeliveryService:CancelDelivery()
 end
 
@@ -137,17 +151,17 @@ end
 --[[
     Initializes the controller.
 ]]
-function DeliveryGuiController:KnitInit()
-	print("DeliveryGuiController initialized")
+function GuiController:KnitInit()
+	print("GuiController initialized")
 end
 
 --[[
     Starts the controller.
 ]]
-function DeliveryGuiController:KnitStart()
+function GuiController:KnitStart()
 	self:InitServices()
 
-	print("DeliveryGuiController started")
+	print("GuiController started")
 	RequestButton.Activated:Connect(function()
 		warnText("A entrega irá começar em breve!",Color3.fromRGB(255,255,255))
 		self:RequestSalad()
@@ -178,4 +192,4 @@ function DeliveryGuiController:KnitStart()
 
 end
 
-return DeliveryGuiController
+return GuiController
