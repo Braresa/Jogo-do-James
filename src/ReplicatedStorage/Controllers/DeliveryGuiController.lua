@@ -1,7 +1,6 @@
 -- ===========================================================================
 -- Roblox Services
 -- ===========================================================================
-local AppUpdateService = game:GetService("AppUpdateService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local SoundService = game:GetService("SoundService")
@@ -14,8 +13,6 @@ local Packages = ReplicatedStorage.Packages
 local Promise = require(ReplicatedStorage.Packages.Promise)
 local Knit = require(Packages.Knit)
 local Trove = require(ReplicatedStorage.Packages.Trove)
-local Replion = require(ReplicatedStorage.Packages.Replion)
-local ReplionClient = Replion.Client
 
 -- ===========================================================================
 -- Variables
@@ -69,7 +66,7 @@ function TweenCreate(gui, speed, animation)
 				local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
 				return tween
 			elseif animation == "rightIn" then
-				gui.Position = gui.Position - UDim2.new(0.5, 0, 0, 0)
+				targetGui.Position = targetGui.Position - UDim2.new(0.5, 0, 0, 0)
 				local propertyTable = { Position = originalPosition }
 				local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
 				return tween
@@ -83,7 +80,7 @@ function TweenCreate(gui, speed, animation)
 				guiTrove:Add(tween)
 				if index == #gui then
 					tween:Play()
-					guiTrove:Connect(tween.Completed,function()
+					guiTrove:Connect(tween.Completed, function()
 						guiTrove:Destroy()
 						resolve()
 					end)
@@ -95,7 +92,7 @@ function TweenCreate(gui, speed, animation)
 			local tween = createAnimation(gui)
 			guiTrove:Add(tween)
 			tween:Play()
-			guiTrove:Connect(tween.Completed,function()
+			guiTrove:Connect(tween.Completed, function()
 				guiTrove:Destroy()
 				resolve()
 			end)
@@ -136,7 +133,8 @@ end
 local function LocationGenerated(expirySeconds, npc)
 	OnDelivery = true
 	task.defer(startTimer, expirySeconds)
-	TweenCreate(OnGoingFrame, 0.5, 'rightIn')
+	TweenCreate(OnGoingFrame, 0.8, "rightIn")
+
 	OnGoingFrame.Visible = true
 	RequestFrame.Visible = false
 	SFX.DeliveryStarted:Play()
@@ -146,6 +144,7 @@ local function LocationGenerated(expirySeconds, npc)
 	highlight.FillColor = Color3.fromRGB(99, 255, 120)
 	highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
 	highlight.OutlineTransparency = 0
+
 	local arrow = DeliveryGui.Arrow:Clone()
 	arrow.Parent = npc.Head
 	arrow.Enabled = true
@@ -156,22 +155,22 @@ end
 local function FailDelivery()
 	OnDelivery = false
 	TweenCreate(OnGoingFrame, 0.4, "leftOut"):andThen(function()
-	OnGoingFrame.Visible = false
-	RequestFrame.Visible = true
-	TweenCreate({ RequestFrame, MoneyFrame }, 0.5, "original")
-	warnText("A entrega falhou!", Color3.fromRGB(255, 0, 0))
+		OnGoingFrame.Visible = false
+		RequestFrame.Visible = true
+		TweenCreate({ RequestFrame, MoneyFrame }, 0.5, "original")
+		warnText("A entrega falhou!", Color3.fromRGB(255, 0, 0))
 	end)
 end
 
 local function Delivered()
 	OnDelivery = false
 	TweenCreate(OnGoingFrame, 0.5, "leftOut"):andThen(function()
-	OnGoingFrame.Visible = false
-	RequestFrame.Visible = true
-	SFX.DeliveryComplete:Play()
-	warnText("A entrega foi um sucesso!", Color3.fromRGB(0, 255, 0))
-	TweenCreate({ RequestFrame, MoneyFrame }, 0.5, "original")
-end)
+		OnGoingFrame.Visible = false
+		RequestFrame.Visible = true
+		SFX.DeliveryComplete:Play()
+		warnText("A entrega foi um sucesso!", Color3.fromRGB(0, 255, 0))
+		TweenCreate({ RequestFrame, MoneyFrame }, 0.5, "original")
+	end)
 end
 
 local function NoSalad() -- Ativado quando o player não possui saladas para entregar.
@@ -182,40 +181,14 @@ end
 -- Public Methods
 -- ===========================================================================
 
-function DeliveryGuiController:InitGui()
-	self.DeliveryService = Knit.GetService("DeliveryService")
-	CancelButton.Activated:Connect(function()
-		self:CancelDelivery()
-	end)
-
-	self.DeliveryService.DeliveryLocation:Connect(function(expirySeconds: number, npc: Instance)
-		LocationGenerated(expirySeconds, npc)
-	end)
-
-	self.DeliveryService.Delivered:Connect(function()
-		Delivered()
-	end)
-
-	self.DeliveryService.FailDelivery:Connect(function()
-		FailDelivery()
-	end)
-
-	self.DeliveryService.NoSalad:Connect(function()
-		NoSalad()
-	end)
-	self.DeliveryService.Warning:Connect(function(text: string, color: Color3)
-		warnText(text, color)
-	end)
-end
-
 --[[
 	- esquerda
 	+ direita
 ]]
 function DeliveryGuiController:RequestSalad()
 	TweenCreate({ MoneyFrame, RequestFrame }, 0.5, "leftOut"):andThen(function()
-	self.DeliveryService:GenerateLocation()
-end)
+		self.DeliveryService:GenerateLocation()
+	end)
 end
 
 function DeliveryGuiController:CancelDelivery()
@@ -225,9 +198,83 @@ end
 function UpdateMoneyLabel(newValue, oldValue)
 	if oldValue > newValue then
 		print("Perdeu dinheiro")
+		Money.Text = tostring(newValue)
 	elseif oldValue < newValue then
 		print("Ganhou dinheiro")
+		Money.Text = tostring(newValue)
+	elseif oldValue == nil or oldValue == newValue then
+		print("Mesma quantidade")
+		Money.Text = tostring(newValue)
 	end
+end
+
+function DeliveryGuiController:InitGui()
+	self.DeliveryService = Knit.GetService("DeliveryService")
+	self.DataService = Knit.GetService("DataService")
+	local function setupDataUpdate()
+		return Promise.new(function(resolve)
+			local connection = self.DataService:OnChange(Player,'Dinheiro',UpdateMoneyLabel)
+			self._Trove:Add(connection)
+			resolve()
+		end)
+	end
+
+	local function connectServerSignals()
+		return Promise.try(function()
+			self.DeliveryService.DeliveryLocation:Connect(
+				function(expirySeconds: number, npc: Instance) -- Recebe do servidor o sinal de que a entrega começou.
+					LocationGenerated(expirySeconds, npc)
+				end
+			)
+
+			CancelButton.Activated:Connect(
+				function() -- Conecta o botão de cancelar com o de cancelar dentro do servidor.
+					self:CancelDelivery()
+				end
+			)
+
+			self.DeliveryService.Delivered:Connect(
+				function() -- Recebe do servidor o sinal de que a entrega foi um sucesso.
+					Delivered()
+				end
+			)
+
+			self.DeliveryService.FailDelivery:Connect(function() -- Recebe do servidor o sinal de que a entrega falhou.
+				FailDelivery()
+			end)
+
+			self.DeliveryService.NoSalad:Connect(function() -- Recebe do servidor o sinal de que você não tem saladas
+				NoSalad()
+			end)
+			self.DeliveryService.Warning:Connect(
+				function(text: string, color: Color3) -- Toca um warning predefinido do servidor.
+					warnText(text, color)
+				end
+			)
+		end)
+	end
+
+	local function setupGui()
+		return Promise.try(function()
+			MoneyFrame.Visible = true
+			RequestFrame.Visible = true
+			TweenCreate({ MoneyFrame, RequestFrame }, 1, "rightIn"):andThen(function()
+				RequestButton.Activated:Connect(function()
+					if not OnDelivery then
+						self:RequestSalad()
+					else
+						warnText("Você já está entregando!", Color3.fromRGB(255, 0, 0))
+					end
+				end)
+			end)
+		end)
+	end
+
+	--[[setupReplion():andThen(function()
+		connectServerSignals():andThenCall(setupGui())
+	end)
+	]]
+	setupDataUpdate():andThenCall(setupGui):andThenCall(connectServerSignals)
 end
 
 -- ===========================================================================
@@ -238,6 +285,7 @@ end
 ]]
 function DeliveryGuiController:KnitInit()
 	print("DeliveryGuiController initialized")
+	self._Trove = Trove.new()
 end
 
 --[[
@@ -245,15 +293,7 @@ end
 ]]
 function DeliveryGuiController:KnitStart()
 	print("DeliveryGuiController started")
-	ReplionClient:WaitReplion('PlayerData')
 	self:InitGui()
-	self.Replion = ReplionClient:GetReplion("PlayerData")
-	Money.Text = tostring(self.Replion:Get("Dinheiro"))
-	self.Replion:OnChange("Dinheiro", UpdateMoneyLabel)
-	RequestButton.Activated:Connect(function()
-		warnText("A entrega irá começar em breve!", Color3.fromRGB(255, 255, 255))
-		self:RequestSalad()
-	end)
 end
 
 return DeliveryGuiController

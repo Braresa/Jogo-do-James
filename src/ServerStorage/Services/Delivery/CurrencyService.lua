@@ -3,15 +3,15 @@
 -- ===========================================================================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local ProcessInstancePhysicsService = game:GetService("ProcessInstancePhysicsService")
+local ServerStorage = game:GetService("ServerStorage")
 
 -- ===========================================================================
 -- Dependencies
 -- ===========================================================================
 local Packages = ReplicatedStorage.Packages
+local PlayerData = require(ServerStorage.Services.Data.PlayerData)
 local Knit = require(Packages.Knit)
-local Replion
-local ReplionServer
-
 -- ===========================================================================
 -- Variables
 -- ===========================================================================
@@ -35,28 +35,20 @@ local CurrencyService = Knit.CreateService({
 -- Internal Methods
 -- ===========================================================================
 
-function getReplion(player)
-	return ReplionServer:GetReplionFor(player, "PlayerData")
-end
 
 function GetMoney(player)
-	local playerReplion = getReplion(player)
-	return playerReplion:Get(CurrencyName)
+	local DataService = Knit.GetService('DataService')
+	return DataService:GetData(player,CurrencyName)
 end
 
 function GiveMoney(player, value)
-	local playerReplion = getReplion(player)
-	if playerReplion then
-		playerReplion:Increase(CurrencyName, value)
-		print(playerReplion:Get(CurrencyName))
+	local DataService = Knit.GetService('DataService')
+		DataService:Increase(player,CurrencyName, value)
 	end
-end
 
-function RemoveMoney(player, value)
-	local playerReplion = getReplion(player)
-	if playerReplion then
-		playerReplion:Decrease(CurrencyName, value)
-	end
+function _RemoveMoney(player, value)
+	local DataService = Knit.GetService('DataService')
+	DataService:Decrease(player,CurrencyName, value)
 end
 
 -- ===========================================================================
@@ -73,11 +65,6 @@ function CurrencyService:GetMoney(player)
 end
 
 function CurrencyService:GiveSalad(player, value)
-	local playerReplion = getReplion(player)
-	local maxSalad = playerReplion:Get("maxSalad")
-	if FruitsSalad[player] >= maxSalad then
-		return
-	end
 	FruitsSalad[player] = FruitsSalad[player] + value
 	self.Client.UpdateSalad:Fire(player, FruitsSalad[player])
 end
@@ -93,7 +80,13 @@ function CurrencyService:DeliverSucess(player)
 	local rng = Random.new():NextInteger(1, #moneyPerFruit)
 	local valueToGive = moneyPerFruit[rng]
 	GiveMoney(player, valueToGive)
+	print(GetMoney(player))
 end
+
+function CurrencyService:InitService()
+	self.DataService = Knit.GetService("DataService")
+end
+
 -- ===========================================================================
 -- Knit Initialization
 -- ===========================================================================
@@ -108,9 +101,7 @@ end
     Starts the service.
 ]]
 function CurrencyService:KnitStart()
-	Replion = require(ReplicatedStorage.Packages.Replion)
-	ReplionServer = Replion.Server
-
+	self:InitService()
 	Players.PlayerAdded:Connect(function(player)
 		FruitsSalad[player] = StartingFruitSalad
 	end)

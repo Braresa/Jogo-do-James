@@ -11,6 +11,7 @@ local Players = game:GetService("Players")
 local Packages = ReplicatedStorage.Packages
 local Knit = require(Packages.Knit)
 local Promise = require(Packages.Promise)
+local Signal = require(Packages.Signal)
 
 -- ===========================================================================
 -- Variables
@@ -24,17 +25,17 @@ local DataConfig = require(script.Parent.DataConfig)
 local PlayerData = require(script.Parent.PlayerData)
 
 -- Modules
-local InternalModules = ServerStorage.Modules
-local ProfileService = require(InternalModules.ProfileService)
-local Replion = require(ReplicatedStorage.Packages.Replion)
-local ReplionServer = Replion.Server
+local ProfileService = require(ServerStorage.Modules.ProfileService)
 
 -- ===========================================================================
 -- Services
 -- ===========================================================================
 local DataService = Knit.CreateService({
 	Name = "DataService",
-	Client = {},
+	Client = {
+		DataChanged = Knit.CreateSignal(),
+	},
+	DataChanged = Signal.new(),
 	ProfileStore = ProfileService.GetProfileStore(DataConfig.DataStore, PlayerData),
 })
 
@@ -103,12 +104,6 @@ function GetProfile(player: Player)
 				profile:Release()
 			end
 
-			ReplionServer.new({
-				Channel = "PlayerData",
-				ReplicateTo = player,
-				Data = profile.Data,
-			})
-
 			return Promise.resolve(profile)
 		end)
 		:finally(function()
@@ -165,11 +160,111 @@ end
 
 	@param player The player to get the data for.
 
-	@return A promise that resolves with the player's data.
+	@return A promise that resolves with the player's profile.
 ]]
-function DataService:GetDataFor(player: Player)
+function DataService:GetProfile(player: Player)
 	return GetProfile(player):andThen(function(profile)
-		return profile.Data
+		return profile
+	end)
+end
+
+--[[
+	Get the player's data.
+
+	@param player The player to get the data for.
+	@param key The key to get the data for.
+
+	@return A promise that resolves with the player's data key.
+]]
+function DataService:GetData(player: Player, key: any)
+	return self:GetProfile(player):andThen(function(profile)
+		return profile.Data[key]
+	end)
+end
+
+function DataService.Client:GetData(player: Player, key: any)
+	return self:GetData(player, key):expect()
+end
+
+--[[
+	Sets the player's data.
+
+	@param player The player to set the data for.
+	@param key The key to set the data for.
+	@param value The value to set the data for.
+]]
+function DataService:SetData(player: Player, key: any, value: any)
+	self:GetProfile(player):andThen(function(profile)
+		local oldValue = self:GetData(player, key):expect()
+		profile.Data[key] = value
+		self.DataChanged:Fire(player, key, value, oldValue)
+	end)
+end
+
+--[[
+	Increases the player's data.
+
+	@param player The player to increase the data for.
+	@param key The key to increase the data for.
+	@param value The value to increase the data for.
+]]
+function DataService:Increase(player: Player, key: any, value: number)
+	self:GetProfile(player):andThen(function(profile)
+		local oldValue = self:GetData(player, key):expect()
+		profile.Data[key] += value
+		self.DataChanged:Fire(player, key, profile.Data[key], oldValue)
+	end)
+end
+
+function DataService:Decrease(player: Player, key: any, value: number)
+	self:GetProfile(player):andThen(function(profile)
+		local oldValue = self:GetData(player, key):expect()
+		profile.Data[key] -= value
+		self.DataChanged:Fire(player, key, profile.Data[key], oldValue)
+	end)
+end
+
+--[[
+	Listens for changes to the player's data.
+
+	@param player The player to listen for changes to the data for.
+	@param key The key to listen for changes to the data for.
+	@param callback The callback to fire when the data changes.
+
+	@return A connection that can be disconnected.
+]]
+function DataService:OnChange(player: Player, key: any, callback: any)
+	local connection = self.DataChanged:Connect(function(_player, _key, value, oldValue)
+		if player == _player and key == _key then
+			callback(value, oldValue)
+		end
+	end)
+
+	return connection
+end
+
+function DataService.Client:OnChange(player: Player, key: any, callback: any)
+	local connection = self.Server:OnChange(player, key, callback)
+	return connection
+end
+
+--[[
+	Initializes events.
+]]
+function DataService:InitEvents()
+	Players.PlayerAdded:Connect(LoadProfile)
+	Players.PlayerRemoving:Connect(ReleaseProfile)
+	for _, player in ipairs(Players:GetPlayers()) do
+		LoadProfile(player)
+	end
+end
+
+--[[
+	Initializes replication.
+]]
+function DataService:InitReplication()
+	self.DataChanged:Connect(function(player, ...)
+		self.Client.DataChanged:Fire(player, ...)
 	end)
 end
 
@@ -189,11 +284,20 @@ end
 function DataService:KnitStart()
 	print("DataService started")
 
-	Players.PlayerAdded:Connect(LoadProfile)
-	Players.PlayerRemoving:Connect(ReleaseProfile)
-	for _, player in ipairs(Players:GetPlayers()) do
-		LoadProfile(player)
-	end
+	-- Initialize replication
+	self:InitReplication()
+
+	-- Initialize events
+	self:InitEvents()
+
+	task.delay(5, function()
+		local player = Players:GetPlayers()[1]
+
+		for i = 1, 3 do
+			self:Increase(player, "Cash", 100)
+			task.wait(1)
+		end
+	end)
 end
 
 return DataService
