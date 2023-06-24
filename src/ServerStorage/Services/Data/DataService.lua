@@ -183,7 +183,7 @@ function DataService:GetData(player: Player, key: any)
 end
 
 function DataService.Client:GetData(player: Player, key: any)
-	return self:GetData(player, key):expect()
+	return self.Server:GetData(player, key):expect()
 end
 
 --[[
@@ -243,11 +243,6 @@ function DataService:OnChange(player: Player, key: any, callback: any)
 	return connection
 end
 
-function DataService.Client:OnChange(player: Player, key: any, callback: any)
-	local connection = self.Server:OnChange(player, key, callback)
-	return connection
-end
-
 --[[
 	Initializes events.
 ]]
@@ -293,7 +288,7 @@ function DataService:KnitStart()
 	task.delay(5, function()
 		local player = Players:GetPlayers()[1]
 
-		for i = 1, 3 do
+		for _i = 1, 3 do
 			self:Increase(player, "Cash", 100)
 			task.wait(1)
 		end

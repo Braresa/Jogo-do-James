@@ -38,7 +38,7 @@ local CurrencyService = Knit.CreateService({
 
 function GetMoney(player)
 	local DataService = Knit.GetService('DataService')
-	return DataService:GetData(player,CurrencyName)
+	return DataService:GetData(player,CurrencyName):expect()
 end
 
 function GiveMoney(player, value)
@@ -56,7 +56,6 @@ end
 -- ===========================================================================
 
 function CurrencyService:CheckSalad(player)
-	print(`{player.Name} tem {FruitsSalad[player]} de salada de fruta!`)
 	return FruitsSalad[player]
 end
 
@@ -83,7 +82,7 @@ function CurrencyService:DeliverSucess(player)
 	print(GetMoney(player))
 end
 
-function CurrencyService:InitService()
+function CurrencyService:ImportServices()
 	self.DataService = Knit.GetService("DataService")
 end
 
@@ -101,10 +100,12 @@ end
     Starts the service.
 ]]
 function CurrencyService:KnitStart()
-	self:InitService()
+	self:ImportServices()
+
 	Players.PlayerAdded:Connect(function(player)
 		FruitsSalad[player] = StartingFruitSalad
 	end)
+
 end
 
 return CurrencyService

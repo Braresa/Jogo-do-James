@@ -30,7 +30,7 @@ local TimerLabel = OnGoingFrame.Inside.TimerLabel
 local MoneyFrame = DeliveryGui.MoneyFrame
 local Money = MoneyFrame.Money
 
-local DefaultPosition = {
+local DefaultButtons = {
 	[RequestFrame] = RequestFrame.Position,
 	[MoneyFrame] = MoneyFrame.Position,
 	[OnGoingFrame] = OnGoingFrame.Position,
@@ -49,25 +49,31 @@ local DeliveryGuiController = Knit.CreateController({
 -- Internal Methods
 -- ===========================================================================
 
-function TweenCreate(gui, speed, animation)
+function TweenCreate(gui, speed, animation,targetColor)
 	return Promise.new(function(resolve)
 		local guiTrove = Trove.new()
 		local enumType = Enum.EasingStyle.Linear
 		local tweenInfo = TweenInfo.new(speed, enumType)
 
 		local function createAnimation(targetGui)
-			local originalPosition = DefaultPosition[targetGui]
+			local originalButtonValue = DefaultButtons[targetGui]
 			if animation == "leftOut" then
-				local propertyTable = { Position = targetGui.Position - UDim2.new(0.1, 0, 0, 0) }
+				local propertyTable = { Position = targetGui.Position - UDim2.new(0.3, 0, 0, 0) }
 				local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
 				return tween
 			elseif animation == "original" then
-				local propertyTable = { Position = originalPosition }
+				local propertyTable = { Position = originalButtonValue }
 				local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
 				return tween
 			elseif animation == "rightIn" then
-				targetGui.Position = targetGui.Position - UDim2.new(0.5, 0, 0, 0)
-				local propertyTable = { Position = originalPosition }
+				targetGui.Position = targetGui.Position - UDim2.new(0.3, 0, 0, 0)
+				local propertyTable = { Position = originalButtonValue }
+				local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
+				return tween
+			elseif animation == "colorFade" then
+				local oldColor = targetGui.BackgroundColor3
+				targetGui.BackgroundColor3 = targetColor
+				local propertyTable = { BackgroundColor3 = oldColor }
 				local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
 				return tween
 			end
@@ -133,7 +139,7 @@ end
 local function LocationGenerated(expirySeconds, npc)
 	OnDelivery = true
 	task.defer(startTimer, expirySeconds)
-	TweenCreate(OnGoingFrame, 0.8, "rightIn")
+	TweenCreate(OnGoingFrame, 0.5, "rightIn")
 
 	OnGoingFrame.Visible = true
 	RequestFrame.Visible = false
@@ -164,13 +170,14 @@ end
 
 local function Delivered()
 	OnDelivery = false
-	TweenCreate(OnGoingFrame, 0.5, "leftOut"):andThen(function()
+	TweenCreate(OnGoingFrame, 0.3, "leftOut"):andThen(function()
 		OnGoingFrame.Visible = false
 		RequestFrame.Visible = true
 		SFX.DeliveryComplete:Play()
 		warnText("A entrega foi um sucesso!", Color3.fromRGB(0, 255, 0))
-		TweenCreate({ RequestFrame, MoneyFrame }, 0.5, "original")
 	end)
+	task.wait(0.5)
+	TweenCreate({ RequestFrame, MoneyFrame }, 0.5, "original")
 end
 
 local function NoSalad() -- Ativado quando o player não possui saladas para entregar.
@@ -197,29 +204,32 @@ end
 
 function UpdateMoneyLabel(newValue, oldValue)
 	if oldValue > newValue then
-		print("Perdeu dinheiro")
+		TweenCreate(MoneyFrame, 2.5, "colorFade", Color3.fromRGB(255,0,0))
 		Money.Text = tostring(newValue)
 	elseif oldValue < newValue then
-		print("Ganhou dinheiro")
+		TweenCreate(MoneyFrame, 2.5, "colorFade", Color3.fromRGB(0,255,0))
 		Money.Text = tostring(newValue)
 	elseif oldValue == nil or oldValue == newValue then
-		print("Mesma quantidade")
 		Money.Text = tostring(newValue)
 	end
 end
 
-function DeliveryGuiController:InitGui()
+function DeliveryGuiController:ImportServices()
 	self.DeliveryService = Knit.GetService("DeliveryService")
-	self.DataService = Knit.GetService("DataService")
+	self.DataController = Knit.GetController("DataController")
+end
+
+function DeliveryGuiController:InitGui()
+	self:ImportServices()
+
 	local function setupDataUpdate()
-		return Promise.new(function(resolve)
-			local connection = self.DataService:OnChange(Player,'Dinheiro',UpdateMoneyLabel)
-			self._Trove:Add(connection)
-			resolve()
+		return Promise.try(function()
+			self._Trove:Connect(self.DataController.GuiUpdate, UpdateMoneyLabel)
 		end)
 	end
 
 	local function connectServerSignals()
+		print("Connect server signals called")
 		return Promise.try(function()
 			self.DeliveryService.DeliveryLocation:Connect(
 				function(expirySeconds: number, npc: Instance) -- Recebe do servidor o sinal de que a entrega começou.
@@ -259,6 +269,9 @@ function DeliveryGuiController:InitGui()
 			MoneyFrame.Visible = true
 			RequestFrame.Visible = true
 			TweenCreate({ MoneyFrame, RequestFrame }, 1, "rightIn"):andThen(function()
+				self.DataController:GetData('Dinheiro'):andThen(function(value)
+					Money.Text = tostring(value)
+				end)
 				RequestButton.Activated:Connect(function()
 					if not OnDelivery then
 						self:RequestSalad()
@@ -266,15 +279,21 @@ function DeliveryGuiController:InitGui()
 						warnText("Você já está entregando!", Color3.fromRGB(255, 0, 0))
 					end
 				end)
+
+				CancelButton.Activated:Connect(function()
+					if OnDelivery then
+						self:CancelDelivery()
+					else
+						warnText("Você não está entregando!", Color3.fromRGB(255, 0, 0))
+					end
+				end)
+
+			
 			end)
 		end)
 	end
 
-	--[[setupReplion():andThen(function()
-		connectServerSignals():andThenCall(setupGui())
-	end)
-	]]
-	setupDataUpdate():andThenCall(setupGui):andThenCall(connectServerSignals)
+	setupDataUpdate():andThenCall(connectServerSignals):andThenCall(setupGui)
 end
 
 -- ===========================================================================

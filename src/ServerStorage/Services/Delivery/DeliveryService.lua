@@ -83,7 +83,6 @@ function GetPlayersFriend(player, destiny)
 				page:AdvanceToNextPageAsync()
 				n += 1
 			end
-			print("Pages processada, criando npc.")
 			local npc = createNPC(friendsId, destiny)
 			ActivePlayers[player].NPC = npc
 			ActivePlayers[player].Friends = friendsId
@@ -92,7 +91,6 @@ function GetPlayersFriend(player, destiny)
 
 		local function getFriendsPage()
 			if ActivePlayers[player].Friends ~= nil then
-				print(`A tabela de amigos do player {player.Name} já foi obtida, criando um dummy com os amigos dele.`)
 				local npc = createNPC(ActivePlayers[player].Friends, destiny)
 				ActivePlayers[player].NPC = npc
 				resolve()
@@ -102,16 +100,13 @@ function GetPlayersFriend(player, destiny)
 			local success, result = pcall(Players.GetFriendsAsync, Players, userId)
 
 			if success then
-				print("Players.GetFriendsAsync foi um sucesso, processando as páginas retornadas.")
 				processPages(result)
 			else
-				warn(`Ocorreu um erro ao tentar pegar os amigos de um player, criando um dummy default.`)
 				local npc = createNPC(friendsId, destiny)
 				ActivePlayers[player].NPC = npc
 				resolve()
 			end
 		end
-
 
 		getFriendsPage()
 	end)
@@ -228,7 +223,6 @@ function DeliveryService:GenerateLocation(player) -- Cria uma localização base
 
 	local destiny = createRNG(player)
 	GetPlayersFriend(player, destiny):finally(function()
-		print("A promise de criar o NPC terminou.")
 		ActivePlayers[player].Connection = destiny.Touched:Connect(function(hit)
 			self:DetectTouch(hit, player, destiny)
 		end)
@@ -248,10 +242,8 @@ function DeliveryService.Client:GenerateLocation(player)
 end
 
 function DeliveryService.Client:CancelDelivery(player)
-	if ActivePlayers[player].Active == false then
-		return self.Client.Warning:Fire("O")
-	else
-	return self.Server:DeliverFailed(player)
+	if ActivePlayers[player].Active == true then
+		self.Server:DeliverFailed(player)
 	end
 end
 -- ===========================================================================
