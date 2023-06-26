@@ -285,14 +285,6 @@ function DataService:KnitStart()
 	-- Initialize events
 	self:InitEvents()
 
-	task.delay(5, function()
-		local player = Players:GetPlayers()[1]
-
-		for _i = 1, 3 do
-			self:Increase(player, "Cash", 100)
-			task.wait(1)
-		end
-	end)
 end
 
 return DataService

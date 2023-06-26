@@ -3,83 +3,93 @@
 -- ===========================================================================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local ProcessInstancePhysicsService = game:GetService("ProcessInstancePhysicsService")
-local ServerStorage = game:GetService("ServerStorage")
 
 -- ===========================================================================
 -- Dependencies
 -- ===========================================================================
 local Packages = ReplicatedStorage.Packages
-local PlayerData = require(ServerStorage.Services.Data.PlayerData)
 local Knit = require(Packages.Knit)
+local Signal = require(Packages.Signal)
 -- ===========================================================================
 -- Variables
 -- ===========================================================================
 local FruitsSalad = {}
 local DeliveryConfig = require(script.Parent.DeliveryConfig)
 local CurrencyName = DeliveryConfig.currencyName
-local StartingFruitSalad = DeliveryConfig.startingFruitSalad
 
 -- ===========================================================================
 -- Services
 -- ===========================================================================
 local CurrencyService = Knit.CreateService({
 	Name = "CurrencyService",
-	Client = {
-		UpdateSalad = Knit.CreateSignal(),
-		UpdateMoney = Knit.CreateSignal(),
-	},
+	Client = {},
+	UpdateSalad = Signal.new(),
 })
 
 -- ===========================================================================
 -- Internal Methods
 -- ===========================================================================
 
-
-function GetMoney(player)
-	local DataService = Knit.GetService('DataService')
-	return DataService:GetData(player,CurrencyName):expect()
-end
-
-function GiveMoney(player, value)
-	local DataService = Knit.GetService('DataService')
-		DataService:Increase(player,CurrencyName, value)
-	end
-
-function _RemoveMoney(player, value)
-	local DataService = Knit.GetService('DataService')
-	DataService:Decrease(player,CurrencyName, value)
-end
-
 -- ===========================================================================
 -- Public Methods
 -- ===========================================================================
 
+function CurrencyService:GiveCurrency(player, key, value)
+	self.DataService:Increase(player, key, value)
+end
+
+function CurrencyService:GetData(player, key)
+	return self.DataService:GetData(player, key)
+end
+
+function CurrencyService:RestoreSalad(player)
+	local maxCapacity = self:GetData(player, "MaxSaladCapacity")
+	maxCapacity:andThen(function(maxQuantity)
+		FruitsSalad[player] = maxQuantity
+		self.UpdateSalad:Fire(player, FruitsSalad[player])
+	end)
+end
+
 function CurrencyService:CheckSalad(player)
 	return FruitsSalad[player]
 end
-
-function CurrencyService:GetMoney(player)
-	return GetMoney(player)
-end
-
-function CurrencyService:GiveSalad(player, value)
-	FruitsSalad[player] = FruitsSalad[player] + value
-	self.Client.UpdateSalad:Fire(player, FruitsSalad[player])
-end
-
-function CurrencyService:RemoveSalad(player, value)
-	FruitsSalad[player] = FruitsSalad[player] - value
-	self.Client.UpdateSalad:Fire(player, FruitsSalad[player])
+function CurrencyService:ChangeSalad(player, value)
+	local expectedValue = FruitsSalad[player] + value
+	local maxCapacity = self:GetData(player, "MaxSaladCapacity")
+	maxCapacity:andThen(function(maxQuantity)
+		if expectedValue <= maxQuantity then
+			FruitsSalad[player] = expectedValue
+		elseif expectedValue <= 0 then
+			FruitsSalad[player] = 0
+		elseif expectedValue > maxQuantity then
+			FruitsSalad[player] = maxQuantity
+		end
+		self.UpdateSalad:Fire(player, FruitsSalad[player])
+	end)
+	self.UpdateSalad:Fire(player, FruitsSalad[player])
 end
 
 function CurrencyService:DeliverSucess(player)
-	self:RemoveSalad(player, 1)
+	self:ChangeSalad(player, -1)
+
 	local moneyPerFruit = DeliveryConfig.moneyPerFruitSalad
 	local rng = Random.new():NextInteger(1, #moneyPerFruit)
 	local valueToGive = moneyPerFruit[rng]
-	GiveMoney(player, valueToGive)
-	print(GetMoney(player))
+
+	self:GiveCurrency(player, CurrencyName, valueToGive)
+end
+
+function CurrencyService:SetupCounter(player, gui, trayTrove)
+	local maxCapacity = self:GetData(player, "MaxSaladCapacity")
+	maxCapacity:andThen(function(maxQuantity)
+		gui.Text = `{FruitsSalad[player]}/{maxQuantity}`
+	end)
+
+	trayTrove:Connect(self.UpdateSalad, function()
+		maxCapacity:andThen(function(maxQuantity)
+			gui.Text = `{FruitsSalad[player]}/{maxQuantity}`
+		end)
+	end)
 end
 
 function CurrencyService:ImportServices()
@@ -103,9 +113,8 @@ function CurrencyService:KnitStart()
 	self:ImportServices()
 
 	Players.PlayerAdded:Connect(function(player)
-		FruitsSalad[player] = StartingFruitSalad
+		FruitsSalad[player] = DeliveryConfig.startingFruitSalad
 	end)
-
 end
 
 return CurrencyService

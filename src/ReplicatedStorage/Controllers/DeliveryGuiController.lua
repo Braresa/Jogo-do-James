@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
 
 -- ===========================================================================
 -- Dependencies
@@ -160,6 +161,7 @@ end
 
 local function FailDelivery()
 	OnDelivery = false
+	SFX.Error:Play()
 	TweenCreate(OnGoingFrame, 0.4, "leftOut"):andThen(function()
 		OnGoingFrame.Visible = false
 		RequestFrame.Visible = true
@@ -182,6 +184,8 @@ end
 
 local function NoSalad() -- Ativado quando o player não possui saladas para entregar.
 	warnText("Você não possui nenhuma salada de fruta para entregar!", Color3.fromRGB(255, 0, 0))
+	SFX.Error:Play()
+	TweenCreate({RequestFrame,MoneyFrame}, 0.3, "original")
 end
 
 -- ===========================================================================
@@ -193,6 +197,7 @@ end
 	+ direita
 ]]
 function DeliveryGuiController:RequestSalad()
+	warnText("Procurando uma entrega...", Color3.fromRGB(255,255,255))
 	TweenCreate({ MoneyFrame, RequestFrame }, 0.5, "leftOut"):andThen(function()
 		self.DeliveryService:GenerateLocation()
 	end)
@@ -207,6 +212,7 @@ function UpdateMoneyLabel(newValue, oldValue)
 		TweenCreate(MoneyFrame, 2.5, "colorFade", Color3.fromRGB(255,0,0))
 		Money.Text = tostring(newValue)
 	elseif oldValue < newValue then
+		SFX.Cash:Play()
 		TweenCreate(MoneyFrame, 2.5, "colorFade", Color3.fromRGB(0,255,0))
 		Money.Text = tostring(newValue)
 	elseif oldValue == nil or oldValue == newValue then
@@ -217,6 +223,10 @@ end
 function DeliveryGuiController:ImportServices()
 	self.DeliveryService = Knit.GetService("DeliveryService")
 	self.DataController = Knit.GetController("DataController")
+end
+
+function DeliveryGuiController:SetupRestore()
+	
 end
 
 function DeliveryGuiController:InitGui()
@@ -276,6 +286,7 @@ function DeliveryGuiController:InitGui()
 					if not OnDelivery then
 						self:RequestSalad()
 					else
+						SFX.Error:Play()
 						warnText("Você já está entregando!", Color3.fromRGB(255, 0, 0))
 					end
 				end)
@@ -284,6 +295,7 @@ function DeliveryGuiController:InitGui()
 					if OnDelivery then
 						self:CancelDelivery()
 					else
+						SFX.Error:Play()
 						warnText("Você não está entregando!", Color3.fromRGB(255, 0, 0))
 					end
 				end)
@@ -313,6 +325,9 @@ end
 function DeliveryGuiController:KnitStart()
 	print("DeliveryGuiController started")
 	self:InitGui()
+
+	StarterGui:SetCore("ResetButtonCallback", false)
+    StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
 end
 
 return DeliveryGuiController

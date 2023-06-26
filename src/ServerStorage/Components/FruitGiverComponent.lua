@@ -10,8 +10,6 @@ local Packages = ReplicatedStorage.Packages
 local Component = require(Packages.Component)
 local Trove = require(Packages.Trove)
 local CollectionService = game:GetService("CollectionService")
-local ServerStorage = game:GetService("ServerStorage")
-local CurrencyService = require(ServerStorage.Services.Delivery.CurrencyService)
 local Knit = require(ReplicatedStorage.Packages.Knit)
 -- ===========================================================================
 -- Variables
@@ -37,16 +35,23 @@ local FruitGiverComponent = Component.new({
 -- ===========================================================================
 function FruitGiverComponent:importServices()
 	self.CurrencyService = Knit.GetService("CurrencyService")
+	self.DeliveryService = Knit.GetService("DeliveryService")
 end
 
-function FruitGiverComponent:InitPrompt()
+function FruitGiverComponent:InitPrompt() 
 	local proximityPrompt = self.Instance:FindFirstChildOfClass("ProximityPrompt")
-		or self._trove:Construct(Instance, "ProximityPrompt")
-	CollectionService:AddTag(proximityPrompt, "FruitGiver")
+	if not proximityPrompt then
+		proximityPrompt = self._trove:Construct(Instance,"ProximityPrompt")
+		proximityPrompt.Parent = self.Instance
+		proximityPrompt.HoldDuration = 5
+		proximityPrompt.ObjectText = "Reabastecer"
+		proximityPrompt.ActionText = "Interagir"
+	else
+		self._trove:Add(proximityPrompt)
+	end
 
 	local function onTriggered(player)
-		self.CurrencyService:GiveSalad(player, 1)
-		self.CurrencyService:CheckSalad(player)
+		self.CurrencyService:ChangeSalad(player, 100)
 	end
 
 	self._trove:Connect(proximityPrompt.Triggered, onTriggered)
@@ -67,7 +72,6 @@ end
     At this point in time, it is safe to grab other components also bound to the same instance.
 ]]
 function FruitGiverComponent:Start()
-	local instance = self.Instance
 	-- import services
 	self:importServices()
 

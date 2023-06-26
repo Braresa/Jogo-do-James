@@ -10,7 +10,9 @@ local Players = game:GetService("Players")
 -- ===========================================================================
 local Packages = ReplicatedStorage.Packages
 local Promise = require(ReplicatedStorage.Packages.Promise)
+local Trove = require(ReplicatedStorage.Packages.Trove)
 local Knit = require(Packages.Knit)
+local Signal = require(Packages.Signal)
 
 -- ===========================================================================
 -- Variables
@@ -40,7 +42,7 @@ local DeliveryService = Knit.CreateService({
 -- ===========================================================================
 
 function createNPC(friendsId, destiny)
-	local randomFriend = if destiny:GetAttribute("CustomAvatar")
+	local randomFriend = if destiny:GetAttribute("CustomAvatar") and destiny:GetAttribute("CustomAvatar") ~= 0
 		then destiny:GetAttribute("CustomAvatar")
 		else friendsId[Random.new():NextInteger(1, #friendsId)]
 	local sucess, humanoidDescription = pcall(Players.GetHumanoidDescriptionFromUserId, Players, randomFriend)
@@ -89,26 +91,22 @@ function GetPlayersFriend(player, destiny)
 			resolve()
 		end
 
-		local function getFriendsPage()
-			if ActivePlayers[player].Friends ~= nil then
-				local npc = createNPC(ActivePlayers[player].Friends, destiny)
-				ActivePlayers[player].NPC = npc
-				resolve()
-				return
-			end
-			local userId = player.UserId
-			local success, result = pcall(Players.GetFriendsAsync, Players, userId)
-
-			if success then
-				processPages(result)
-			else
-				local npc = createNPC(friendsId, destiny)
-				ActivePlayers[player].NPC = npc
-				resolve()
-			end
+		if ActivePlayers[player].Friends ~= nil then
+			local npc = createNPC(ActivePlayers[player].Friends, destiny)
+			ActivePlayers[player].NPC = npc
+			resolve()
+			return
 		end
+		local userId = player.UserId
+		local success, result = pcall(Players.GetFriendsAsync, Players, userId)
 
-		getFriendsPage()
+		if success then
+			processPages(result)
+		else
+			local npc = createNPC(friendsId, destiny)
+			ActivePlayers[player].NPC = npc
+			resolve()
+		end
 	end)
 end
 
@@ -261,9 +259,17 @@ end
 ]]
 function DeliveryService:KnitStart()
 	local DeliveryPoint = CollectionService:GetTagged("DeliveryPoint")
+	if #DeliveryPoint == 0 then
+		error("Nenhum DeliveryPoint encontrado! Adicione a tag DeliveryPoint em um part para que o script funcione.")
+		return
+	end
 	self:InitServices()
 	for _, point in pairs(DeliveryPoint) do
-		table.insert(AvailablePoints, point)
+		if point:GetAttribute("Enabled") == false then
+			continue
+		else
+			table.insert(AvailablePoints, point)
+		end
 	end
 
 	Players.PlayerAdded:Connect(function(player)
@@ -274,7 +280,25 @@ function DeliveryService:KnitStart()
 			LastPart = nil,
 			NPC = nil,
 			Friends = nil,
+			PlayerTrove = Trove.new(),
 		}
+		local playersTable = ActivePlayers[player]
+		local trayTrove
+		playersTable.PlayerTrove:Connect(player.CharacterAdded, function(character)
+			if trayTrove then
+				trayTrove:Destroy()
+			else
+				trayTrove = playersTable.PlayerTrove:Extend()
+			end
+
+			local trayCloned = DeliveryConfig.trayLocation:Clone()
+			local counterGui = trayCloned.Handle.MaxSalad.Gui.Quantity
+
+			trayCloned.Parent = player.Backpack
+			local humanoid = character:FindFirstChild("Humanoid")
+			humanoid:EquipTool(trayCloned)
+			self.CurrencyService:SetupCounter(player, counterGui, trayTrove)
+		end)
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)
@@ -284,7 +308,8 @@ function DeliveryService:KnitStart()
 			playerTable.Connection:Disconnect()
 			playerTable.Connection = nil
 			table.insert(AvailablePoints, playerTable.PartUsed)
-			ActivePlayers[player].NPC:Destroy()
+			playerTable.NPC:Destroy()
+			playerTable.PlayerTrove:Destroy()
 		end
 		task.wait(5)
 		ActivePlayers[player] = nil
