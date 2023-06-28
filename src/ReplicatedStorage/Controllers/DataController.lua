@@ -63,7 +63,7 @@ function DataController:OnChange(key: any)
 	print("Rodado")
 	local connection = self.DataService.DataChanged:Connect(function(_key: any, _value: any, _oldValue: any)
 		if _key == key then
-			self.GuiUpdate:Fire(_value, _oldValue)
+			self.GuiUpdate:Fire(key,_value, _oldValue)
 		end
 	end)
 

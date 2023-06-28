@@ -210,17 +210,31 @@ end
 ]]
 function DataService:Increase(player: Player, key: any, value: number)
 	self:GetProfile(player):andThen(function(profile)
+		if typeof(profile.Data[key]) == "number" then
 		local oldValue = self:GetData(player, key):expect()
 		profile.Data[key] += value
 		self.DataChanged:Fire(player, key, profile.Data[key], oldValue)
+		elseif typeof(profile.Data[key]) == "table" then
+			table.insert(profile.Data[key], value)
+			self.DataChanged:Fire(player, key, profile.Data[key])
+		else
+			warn("Cannot increase a non-number value")
+		end
 	end)
 end
 
 function DataService:Decrease(player: Player, key: any, value: number)
 	self:GetProfile(player):andThen(function(profile)
+		if typeof(profile.Data[key]) == "number" then
 		local oldValue = self:GetData(player, key):expect()
 		profile.Data[key] -= value
 		self.DataChanged:Fire(player, key, profile.Data[key], oldValue)
+		elseif typeof(profile.Data[key]) == "table" then
+			table.remove(profile.Data[key], value)
+			self.DataChanged:Fire(player, key, profile.Data[key])
+		else
+			warn("Cannot decrease a non-number value")
+		end
 	end)
 end
 

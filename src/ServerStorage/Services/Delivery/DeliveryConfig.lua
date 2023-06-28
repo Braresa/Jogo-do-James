@@ -4,5 +4,5 @@ return {
 	expirySeconds = 60,
 	dummyLocation = game:GetService("ServerStorage"):WaitForChild("DefaultDummy"),
 	trayLocation = game:GetService("ServerStorage"):WaitForChild("Bandeja"),
-	startingFruitSalad = 0
+	startingFruitSalad = 2
 }

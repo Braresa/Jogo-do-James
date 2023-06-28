@@ -123,7 +123,7 @@ end
 	@param player The player to execute this function.
 ]]
 function resetPlayer(player)
-	local playerTable = ActivePlayers[player] -- Resetando o player de tudo que envolve ele dentro da entrega.
+	local playerTable = ActivePlayers[player]
 	playerTable.Active = false
 	playerTable.Connection:Disconnect()
 	playerTable.Connection = nil
@@ -186,6 +186,32 @@ function createRNG(player)
 	ActivePlayers[player].PartUsed = destiny
 	return destiny
 end
+-- ===========================================================================
+-- Private Methods
+-- ===========================================================================
+
+--[[
+	Determine the seconds that the delivery will take.
+	@param player The player to execute this function.
+	@param destiny The destiny of the delivery.
+	@return The seconds that the delivery will take.
+]]
+
+function determineDeliverySeconds(player, destiny)
+	local distance = (player.Character.HumanoidRootPart.Position - destiny.Position).Magnitude
+	local seconds = math.floor(distance / 100) * 10
+	if seconds > 10 and seconds < 40 then
+		seconds = 30
+	elseif seconds > 30 and seconds < 60 then
+		seconds = 45
+	elseif seconds > 60 and seconds < 90 then
+		seconds = 60
+	elseif seconds >= 90 then
+		seconds = 80
+	end
+	return seconds
+end
+
 --[[
 	Initiate the timer of the delivery.
 	@param player The player to execute this function.
@@ -220,17 +246,14 @@ function DeliveryService:GenerateLocation(player) -- Cria uma localização base
 	ActivePlayers[player].Active = true
 
 	local destiny = createRNG(player)
+	determineDeliverySeconds(player, destiny)
 	GetPlayersFriend(player, destiny):finally(function()
 		ActivePlayers[player].Connection = destiny.Touched:Connect(function(hit)
 			self:DetectTouch(hit, player, destiny)
 		end)
-		if destiny:GetAttribute("CustomExpiry") then
-			task.defer(initTimer, player, destiny:GetAttribute("CustomExpiry"))
-			self.Client.DeliveryLocation:Fire(player, destiny:GetAttribute("CustomExpiry"), ActivePlayers[player].NPC)
-		else
-			task.defer(initTimer, player, expirySeconds)
-			self.Client.DeliveryLocation:Fire(player, expirySeconds, ActivePlayers[player].NPC)
-		end
+		local secondsToDelivery = determineDeliverySeconds(player, destiny)
+		task.defer(initTimer, player, secondsToDelivery)
+		self.Client.DeliveryLocation:Fire(player, secondsToDelivery, ActivePlayers[player].NPC)
 	end)
 	return
 end

@@ -6,6 +6,7 @@ local Players = game:GetService("Players")
 local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 local StarterGui = game:GetService("StarterGui")
+local RunService = game:GetService("RunService")
 
 -- ===========================================================================
 -- Dependencies
@@ -14,6 +15,7 @@ local Packages = ReplicatedStorage.Packages
 local Promise = require(ReplicatedStorage.Packages.Promise)
 local Knit = require(Packages.Knit)
 local Trove = require(ReplicatedStorage.Packages.Trove)
+local Module3D = require(ReplicatedStorage.Modules.Module3D)
 
 -- ===========================================================================
 -- Variables
@@ -30,12 +32,19 @@ local OnDelivery = false
 local TimerLabel = OnGoingFrame.Inside.TimerLabel
 local MoneyFrame = DeliveryGui.MoneyFrame
 local Money = MoneyFrame.Money
+local SpawnFrame = DeliveryGui.SpawnFrame
+local SpawnFrameButton = DeliveryGui.SpawnButton
+local SpawnButton = SpawnFrameButton.Button
 
 local DefaultButtons = {
 	[RequestFrame] = RequestFrame.Position,
 	[MoneyFrame] = MoneyFrame.Position,
 	[OnGoingFrame] = OnGoingFrame.Position,
+	[SpawnFrameButton] = SpawnFrameButton.Position,
+	[SpawnFrame] = SpawnFrame.Position,
 }
+
+local Model3DCache = {}
 
 local SFX = SoundService:WaitForChild("SFX")
 
@@ -50,14 +59,14 @@ local DeliveryGuiController = Knit.CreateController({
 -- Internal Methods
 -- ===========================================================================
 
-function TweenCreate(gui, speed, animation,targetColor)
+function TweenCreate(gui, speed, animation, targetColor, defaultCustom)
 	return Promise.new(function(resolve)
 		local guiTrove = Trove.new()
 		local enumType = Enum.EasingStyle.Linear
 		local tweenInfo = TweenInfo.new(speed, enumType)
 
 		local function createAnimation(targetGui)
-			local originalButtonValue = DefaultButtons[targetGui]
+			local originalButtonValue = defaultCustom or DefaultButtons[targetGui] or targetGui.Position
 			if animation == "leftOut" then
 				local propertyTable = { Position = targetGui.Position - UDim2.new(0.3, 0, 0, 0) }
 				local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
@@ -75,6 +84,19 @@ function TweenCreate(gui, speed, animation,targetColor)
 				local oldColor = targetGui.BackgroundColor3
 				targetGui.BackgroundColor3 = targetColor
 				local propertyTable = { BackgroundColor3 = oldColor }
+				local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
+				return tween
+			elseif animation == "bottomIn" then
+				targetGui.Position = targetGui.Position - UDim2.new(0, 0, 0.5, 0)
+				local propertyTable = { Position = originalButtonValue }
+				local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
+				return tween
+			elseif animation == "rightOut" then
+				local propertyTable = { Position = targetGui.Position + UDim2.new(0.3, 0, 0, 0) }
+				local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
+				return tween
+			elseif animation == "topOut" then
+				local propertyTable = { Position = targetGui.Position - UDim2.new(0.0, 0, 0.5, 0) }
 				local tween = TweenService:Create(targetGui, tweenInfo, propertyTable)
 				return tween
 			end
@@ -107,6 +129,60 @@ function TweenCreate(gui, speed, animation,targetColor)
 	end)
 end
 
+function DeattachModel(frame: Frame)
+	local frameData = Model3DCache[frame]
+
+	if frameData then
+		frameData.Trove:Destroy()
+	end
+end
+function AttachModel(frame: Frame, model: Model, customTrove: any?)
+	-- Deattach all currently attached models from the frame
+	DeattachModel(frame)
+
+	-- Create the trove
+	local modelTrove = customTrove and customTrove:Extend() or Trove.new()
+	modelTrove:AttachToInstance(frame)
+	local morph = modelTrove:Clone(model)
+	for _, v in pairs(morph:GetDescendants()) do
+		if v:IsA("Script") or v:IsA("LocalScript") or v:IsA("ModuleScript") then
+			v:Destroy()
+		end
+	end
+	local model3d = modelTrove:Construct(function()
+		return Module3D:Attach3D(frame, morph)
+	end)
+
+	-- Configure the 3d model
+	model3d:SetDepthMultiplier(1)
+	model3d.CurrentCamera.FieldOfView = 40
+	model3d.Visible = true
+	modelTrove:Add(function()
+		Model3DCache[frame] = nil
+	end)
+
+	-- Cache the model
+	Model3DCache[frame] = {
+		Trove = modelTrove,
+		Model = model3d,
+	}
+end
+
+-- Set-up the update loop for morphs
+function RenderModels()
+	RunService:BindToRenderStep("RenderModels3D", Enum.RenderPriority.Last.Value, function()
+		for frame, frameData in pairs(Model3DCache) do
+			local model = frameData.Model
+			if not (frame and frame.Parent and model and model.Object3D) then
+				DeattachModel(frame)
+				continue
+			end
+
+			-- If the mode is rotate, rotate the model every frame
+			model:SetCFrame(CFrame.Angles(0, tick() % (math.pi * 2), 0) * CFrame.Angles(math.rad(-10), 0, 0))
+		end
+	end)
+end
 local lastMessageAt = 0
 
 local function warnText(text, color)
@@ -185,7 +261,7 @@ end
 local function NoSalad() -- Ativado quando o player não possui saladas para entregar.
 	warnText("Você não possui nenhuma salada de fruta para entregar!", Color3.fromRGB(255, 0, 0))
 	SFX.Error:Play()
-	TweenCreate({RequestFrame,MoneyFrame}, 0.3, "original")
+	TweenCreate({ RequestFrame, MoneyFrame }, 0.3, "original")
 end
 
 -- ===========================================================================
@@ -197,7 +273,7 @@ end
 	+ direita
 ]]
 function DeliveryGuiController:RequestSalad()
-	warnText("Procurando uma entrega...", Color3.fromRGB(255,255,255))
+	warnText("Procurando uma entrega...", Color3.fromRGB(255, 255, 255))
 	TweenCreate({ MoneyFrame, RequestFrame }, 0.5, "leftOut"):andThen(function()
 		self.DeliveryService:GenerateLocation()
 	end)
@@ -209,11 +285,11 @@ end
 
 function UpdateMoneyLabel(newValue, oldValue)
 	if oldValue > newValue then
-		TweenCreate(MoneyFrame, 2.5, "colorFade", Color3.fromRGB(255,0,0))
+		TweenCreate(MoneyFrame, 2.5, "colorFade", Color3.fromRGB(255, 0, 0))
 		Money.Text = tostring(newValue)
 	elseif oldValue < newValue then
 		SFX.Cash:Play()
-		TweenCreate(MoneyFrame, 2.5, "colorFade", Color3.fromRGB(0,255,0))
+		TweenCreate(MoneyFrame, 2.5, "colorFade", Color3.fromRGB(0, 255, 0))
 		Money.Text = tostring(newValue)
 	elseif oldValue == nil or oldValue == newValue then
 		Money.Text = tostring(newValue)
@@ -223,11 +299,46 @@ end
 function DeliveryGuiController:ImportServices()
 	self.DeliveryService = Knit.GetService("DeliveryService")
 	self.DataController = Knit.GetController("DataController")
+	self.DataService = Knit.GetService("DataService")
 end
 
-function DeliveryGuiController:SetupRestore()
-	
+function DeliveryGuiController:UpdateMotorcycleGui()
+	for _,gui in ipairs(SpawnFrame.ScrollingFrame:GetChildren()) do
+		if gui:IsA("Frame") and gui.Name ~= "Template" then
+			gui:Destroy()
+		end
+	end
+	return Promise.try(function()
+	self.DataController:GetData("Motorcycles"):andThen(function(ownedMotorcycles)
+		for _, bikeName in ipairs(ownedMotorcycles) do
+			local bike = ReplicatedStorage.Motorcycles:FindFirstChild(bikeName)
+			if not bike then
+				continue
+			end
+			local templateCloned = SpawnFrame.ScrollingFrame.Template:Clone()
+			if bike:GetAttribute("CustomName") then
+				templateCloned.BikeName.Text = bike:GetAttribute("CustomName")
+			else
+				templateCloned.BikeName.Text = bike.Name
+			end
+			templateCloned.Visible = true
+			templateCloned.Parent = SpawnFrame.ScrollingFrame
+			AttachModel(templateCloned.Frame, bike)
+
+			templateCloned.Button.Activated:Connect(function()
+				TweenCreate(SpawnFrame, 0.5, "topOut"):andThen(function()
+					-- pedir pro server spawnar moto
+					SpawnFrame.Visible = false
+					SpawnFrameButton.Visible = true
+					TweenCreate(SpawnFrameButton, 0.4, "original")
+				end)
+			end)
+		end
+		end)
+	end)
 end
+
+function DeliveryGuiController:SetupRestore() end
 
 function DeliveryGuiController:InitGui()
 	self:ImportServices()
@@ -274,14 +385,24 @@ function DeliveryGuiController:InitGui()
 		end)
 	end
 
+	local function setupMotorcycleGui()
+		self:UpdateMotorcycleGui()
+		return Promise.try(function()
+			self._Trove:Connect(self.DataService.DataChanged,function()
+				self:UpdateMotorcycleGui()
+			end)
+		end)
+	end
+
 	local function setupGui()
 		return Promise.try(function()
 			MoneyFrame.Visible = true
 			RequestFrame.Visible = true
 			TweenCreate({ MoneyFrame, RequestFrame }, 1, "rightIn"):andThen(function()
-				self.DataController:GetData('Dinheiro'):andThen(function(value)
+				self.DataController:GetData("Dinheiro"):andThen(function(value)
 					Money.Text = tostring(value)
 				end)
+
 				RequestButton.Activated:Connect(function()
 					if not OnDelivery then
 						self:RequestSalad()
@@ -300,12 +421,19 @@ function DeliveryGuiController:InitGui()
 					end
 				end)
 
-			
+				SpawnButton.Activated:Connect(function()
+					TweenCreate(SpawnFrameButton, 0.6, "rightOut"):andThen(function()
+						SpawnFrameButton.Visible = false
+						SpawnFrame.Visible = true
+						TweenCreate(SpawnFrame, 0.6, "bottomIn")
+					end)
+				end)
+
 			end)
 		end)
 	end
 
-	setupDataUpdate():andThenCall(connectServerSignals):andThenCall(setupGui)
+	setupDataUpdate():andThenCall(connectServerSignals):andThenCall(setupGui):andThenCall(setupMotorcycleGui)
 end
 
 -- ===========================================================================
@@ -326,8 +454,8 @@ function DeliveryGuiController:KnitStart()
 	print("DeliveryGuiController started")
 	self:InitGui()
 
-	StarterGui:SetCore("ResetButtonCallback", false)
-    StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+	RenderModels()
 end
 
 return DeliveryGuiController
